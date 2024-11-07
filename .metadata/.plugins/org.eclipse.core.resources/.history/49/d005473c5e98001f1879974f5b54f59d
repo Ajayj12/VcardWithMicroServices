@@ -1,0 +1,20 @@
+package com.Vcard.CardService.FeignClient;
+
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+
+import com.Vcard.CardService.DTO.BankDetailsDto;
+import com.Vcard.CardService.DTO.EmployeeDto;
+
+@FeignClient(name = "EmployeeService", url = "http://localhost:5002")
+public interface EmployeeFeignClient {
+
+	
+	@GetMapping("/api/user/bank/{associateId}")
+	BankDetailsDto findBankByEmployee_AssociateId(Integer associateId);
+
+	@GetMapping("/api/user/{associateId}")
+	EmployeeDto findByAssociateId(@PathVariable Integer associateId);
+
+}

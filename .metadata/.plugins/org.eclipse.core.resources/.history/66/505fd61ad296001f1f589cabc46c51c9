@@ -1,0 +1,5 @@
+package com.Vcard.EmployeeService.FeignClient;
+
+public interface CardServiceFeignClient {
+
+}

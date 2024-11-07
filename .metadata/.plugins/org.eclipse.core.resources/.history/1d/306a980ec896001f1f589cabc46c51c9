@@ -1,0 +1,8 @@
+package com.Vcard.CardService.FeignClient;
+
+import org.springframework.cloud.openfeign.FeignClient;
+
+@FeignClient(name = "EmployeeService", url = "http://localhost:5002")
+public interface EmployeeFeignClient {
+
+}

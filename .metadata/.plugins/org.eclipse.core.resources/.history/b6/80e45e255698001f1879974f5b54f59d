@@ -1,0 +1,27 @@
+package com.Vcard.EmployeeService.Feign;
+
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+
+import com.Vcard.EmployeeService.DTO.CardDto;
+import com.Vcard.EmployeeService.DTO.EmployeeDto;
+import com.Vcard.EmployeeService.DTO.TransactionDto;
+
+@FeignClient(name = "CardService", url = "http://localhost:5001")
+public interface CardServiceFeignClient {
+
+	@PutMapping
+	void setPinNumber(@RequestBody CardDto cardDto);
+	
+	@PostMapping
+	void convert(@RequestBody TransactionDto transactDto);
+
+	@PostMapping
+	void Buy(@RequestBody TransactionDto transactDto);
+
+	@PostMapping("api/user/newcard")
+	void createCard(@RequestBody EmployeeDto employee);
+
+}

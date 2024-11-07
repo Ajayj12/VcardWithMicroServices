@@ -1,0 +1,12 @@
+package com.Vcard.EmployeeService.Feign;
+
+import org.springframework.cloud.openfeign.FeignClient;
+
+import com.Vcard.EmployeeService.DTO.CardDto;
+
+@FeignClient
+public interface CardServiceFeignClient {
+
+	void setPinNumber(CardDto cardDto);
+
+}

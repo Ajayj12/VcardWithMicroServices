@@ -1,0 +1,5 @@
+package com.Vcard.CardService.Exception;
+
+public class CustomeFeignErrorDecoder {
+
+}

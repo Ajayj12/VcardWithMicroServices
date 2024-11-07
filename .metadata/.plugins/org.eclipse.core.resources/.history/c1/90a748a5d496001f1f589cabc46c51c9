@@ -1,0 +1,16 @@
+package com.Vcard.EmployeeService.Feign;
+
+import org.springframework.cloud.openfeign.FeignClient;
+
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+
+import com.Vcard.EmployeeService.DTO.CardDto;
+
+@FeignClient(name = "CardService", url = "http://localhost:5001")
+public interface CardServiceFeignClient {
+
+	
+	void setPinNumber(CardDto cardDto);
+
+}

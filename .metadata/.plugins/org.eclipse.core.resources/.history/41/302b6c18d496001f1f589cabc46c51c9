@@ -1,0 +1,14 @@
+package com.Vcard.EmployeeService.Feign;
+
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.PostMapping;
+
+import com.Vcard.EmployeeService.DTO.CardDto;
+
+@FeignClient
+public interface CardServiceFeignClient {
+
+	@PostMapping
+	void setPinNumber(CardDto cardDto);
+
+}

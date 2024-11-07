@@ -1,0 +1,242 @@
+package com.Vcard.EmployeeService.ServiceImpl;
+
+
+import java.time.LocalDate;
+import java.time.Period;
+import java.util.Date;
+import java.util.Optional;
+
+import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.Vcard.EmployeeService.DTO.BankDetailsDto;
+import com.Vcard.EmployeeService.DTO.CardCategoryDto;
+import com.Vcard.EmployeeService.DTO.CardDto;
+import com.Vcard.EmployeeService.DTO.EmployeeDto;
+import com.Vcard.EmployeeService.DTO.TransactionDto;
+import com.Vcard.EmployeeService.Entity.BankDetails;
+import com.Vcard.EmployeeService.Entity.CardCategory;
+import com.Vcard.EmployeeService.Entity.CardEntity;
+import com.Vcard.EmployeeService.Enum.CardStatus;
+import com.Vcard.EmployeeService.Entity.EmployeeEntity;
+import com.Vcard.EmployeeService.Enum.Limitpoints;
+import com.Vcard.EmployeeService.Entity.MTransaction;
+import com.Vcard.EmployeeService.Entity.Purchases;
+import com.Vcard.EmployeeService.Enum.Status;
+import com.Vcard.EmployeeService.Enum.TransactionType;
+import com.Vcard.EmployeeService.Exception.CustomIllegalArguementException;
+import com.Vcard.EmployeeService.Exception.CustomRunTimeException;
+import com.Vcard.EmployeeService.Feign.CardServiceFeignClient;
+import com.Vcard.EmployeeService.Repository.BankDetailsRepository;
+import com.Vcard.EmployeeService.Repository.CardRepository;
+import com.Vcard.EmployeeService.Repository.EmployeeRepository;
+import com.Vcard.EmployeeService.Repository.TransactionsRepository;
+
+@Service
+public class EmployeeService {
+	
+	@Autowired
+	private EmployeeRepository employeeRepo;
+	
+	@Autowired
+	private BankDetailsRepository bankDetailsRepo;
+	
+	@Autowired
+	private CardServiceFeignClient cardServiceClient;
+	
+	
+	@Autowired
+	private ModelMapper modelMapper;
+	
+	
+	public void setPinNumber(CardDto cardDto) {
+		
+		cardServiceClient.setPinNumber(cardDto);
+		
+		
+		
+	}
+	
+	
+	
+	public BankDetailsDto setVpa(BankDetailsDto bankdetails) {
+		Optional<EmployeeEntity> empOptional = employeeRepo.findByAssociateId(bankdetails.getAssociateId());
+	    if (empOptional.isEmpty()) {
+	        throw new CustomRunTimeException("Employee not found for associateId: " + bankdetails.getAssociateId());
+	    }
+	    
+	    EmployeeEntity emp = empOptional.get();
+	    
+	    BankDetails bank = new BankDetails();
+	    
+	   
+	    bank.setVpaId(emp.getMobile());
+	    bank.setEmployee(emp);
+	    
+	
+	    return modelMapper.map(bankDetailsRepo.save(bank), BankDetailsDto.class);
+	}
+	
+	
+	
+
+	
+	public TransactionDto convert(TransactionDto transactDto) {
+		Optional<CardEntity> cardopt = cardRepo.findByCardNumber(transactDto.getCardNumber());
+		if(cardopt.isEmpty()) {
+			throw new CustomIllegalArguementException("No Card with the Card Number");
+		}
+		Date Cd = new Date();
+		
+		CardEntity card = cardopt.get();
+		MTransaction mtr = new MTransaction();
+		
+		EmployeeEntity empOptional = card.getEmployee();
+	    if (empOptional.getAssociateId() == null) {
+	        throw new CustomRunTimeException("associateId cannot be null");
+	    }
+	    
+		
+		BankDetails bank = bankDetailsRepo.findByEmployee_AssociateId(empOptional.getAssociateId());
+
+		CardCategory ctype = card.getCardType();
+		LocalDate currentDate = LocalDate.now();
+		int dayOfMonth = currentDate.getDayOfMonth();
+		double finalWithdrawal = (transactDto.getAmountOfPoints() * ctype.getConversionRate());
+		
+		if(card.getStatus() != CardStatus.ACTIVE){
+			throw new CustomIllegalArguementException("Not Eligible");
+		}
+		
+		else if(card.getBalance() <= card.getRewardLimits()/2){
+			throw new CustomIllegalArguementException("Balance is less than half of the Limit");
+		}
+		
+		else if(dayOfMonth >= 1 && dayOfMonth <= 25){
+			throw new CustomIllegalArguementException("Conversion is Only between 26th and 31st of Month ");
+		}
+		
+		else if (transactDto.getAmountOfPoints() > card.getBalance()) {
+            throw new CustomIllegalArguementException("Not enough points to convert.");
+        }
+		
+		else if(card.getPin() != transactDto.getPin()) {
+			mtr.setTransactionType(TransactionType.CONVERSION);
+			mtr.setStatus(Status.FAILED);
+			mtr.setCost(finalWithdrawal);
+			mtr.setTransactionDate(Cd);
+			mtr.setCard(card);
+			
+			
+			modelMapper.map(transactRepo.save(mtr), TransactionDto.class);
+			
+			throw new CustomIllegalArguementException("Wrong PIN entered.");
+
+		}
+		
+		else if(!bank.getVpaId().equals(transactDto.getVpa())) {
+			mtr.setTransactionType(TransactionType.CONVERSION);
+			mtr.setStatus(Status.FAILED);
+			mtr.setCost(finalWithdrawal);
+			mtr.setTransactionDate(Cd);
+			mtr.setCard(card);
+			
+			modelMapper.map(transactRepo.save(mtr), TransactionDto.class);
+			throw new CustomIllegalArguementException("Wrong UPI entered.");
+
+		}
+		
+		
+	
+		
+		
+		int pts = card.getBalance() - transactDto.getAmountOfPoints();
+		
+		bank.setVpaId(transactDto.getVpa());
+		mtr.setTransactionType(TransactionType.CONVERSION);
+		mtr.setStatus(Status.SUCCESS);
+		card.setBalance(pts);
+		mtr.setCost(finalWithdrawal);
+		
+		mtr.setTransactionDate(Cd)	;	
+		mtr.setCard(card);
+		
+		return modelMapper.map(transactRepo.save(mtr), TransactionDto.class);
+		
+		
+
+	}
+	
+	
+	
+	
+	
+	public TransactionDto Buy(TransactionDto transactDto) {
+		Optional<CardEntity> cardopt = cardRepo.findByCardNumber(transactDto.getCardNumber());
+		if(cardopt.isEmpty()) {
+			throw new CustomIllegalArguementException("Wrong Card Number");
+		}
+		Date Cd = new Date();
+		CardEntity card = cardopt.get();
+		
+		EmployeeEntity emp = card.getEmployee();
+		
+		MTransaction mtr = new MTransaction();
+		
+		CardCategory ctype = card.getCardType();
+		
+		double finalWithdrawal = (transactDto.getAmountOfPoints() * ctype.getConversionRate());
+		
+		
+	    if (emp == null) {
+	        throw new CustomRunTimeException("Employee not found");
+	    }
+	    
+	    
+	    if(card.getStatus() != CardStatus.ACTIVE){
+			throw new CustomIllegalArguementException("Not Eligible");
+		}
+		
+		else if(card.getBalance() <= transactDto.getAmountOfPoints()){
+			throw new CustomIllegalArguementException("Insufficient Balance");
+		}
+	    
+		else if(card.getPin() != transactDto.getPin()) {
+			mtr.setTransactionType(transactDto.getTransactType());
+			mtr.setStatus(Status.FAILED);
+			mtr.setCost(finalWithdrawal);
+			mtr.setTransactionDate(Cd);
+			mtr.setCard(card);
+			
+			
+			
+			modelMapper.map(transactRepo.save(mtr), TransactionDto.class);
+			
+			
+			throw new CustomIllegalArguementException("Wrong PIN entered.");
+
+		}
+	    
+	    int pts = card.getBalance() - transactDto.getAmountOfPoints();
+	    
+	    mtr.setTransactionType(transactDto.getTransactType());
+		mtr.setStatus(Status.SUCCESS);
+		card.setBalance(pts);
+		mtr.setCost(finalWithdrawal);
+		mtr.setTransactionDate(Cd);
+		mtr.setCard(card);
+		
+		
+		return modelMapper.map(transactRepo.save(mtr), TransactionDto.class);
+	    
+		
+	}
+	
+	
+
+	
+	
+	
+
+}
